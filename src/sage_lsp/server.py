@@ -2,91 +2,55 @@
 
 from __future__ import annotations
 
+import json
 import keyword
+import os
 import re
+from pathlib import Path
+from importlib.resources import files as resources_files
 from typing import Final
 from urllib.parse import unquote, urlparse
 
 from pylsp import hookimpl, lsp
 
-SAGE_SYMBOL_INFO: Final[dict[str, dict[str, str]]] = {
-    "CC": {
-        "help": "Sage complex field placeholder alias (exact constructor depends on the Sage build).",
-    },
-    "DirichletGroup": {
-        "help": "Factory for a Dirichlet group over an integer modulus.",
-    },
-    "EllipticCurve": {
-        "help": "Constructor for Sage elliptic curves.",
-    },
-    "GF": {
-        "help": "Finite field constructor.",
-    },
-    "IntegralLattice": {
-        "help": "Sage object used for constructions on integral lattices.",
-        "signature": "IntegralLattice(*args, **kwargs)",
-    },
-    "Integer": {
-        "help": "Sage integer type.",
-    },
-    "Matrix": {
-        "help": "Matrix constructor or matrix-like type in Sage.",
-        "signature": "Matrix(*args, **kwargs)",
-    },
-    "MatrixSpace": {
-        "help": "Free module / matrix space constructor.",
-        "signature": "MatrixSpace(R, n, m)",
-    },
-    "ModularForms": {
-        "help": "Modular forms space/construction entrypoint.",
-    },
-    "Polynomial": {
-        "help": "Sage polynomial element or polynomial-like class depending on context.",
-    },
-    "PolynomialRing": {
-        "help": "Constructs a polynomial ring over a base ring.",
-        "signature": "PolynomialRing(R, names)",
-    },
-    "QQ": {
-        "help": "Sage rational field.",
-    },
-    "QQbar": {
-        "help": "Field of algebraic numbers over QQ.",
-    },
-    "RR": {
-        "help": "Sage real field.",
-    },
-    "SR": {
-        "help": "Symbolic ring constructor (symbolic expressions in Sage).",
-    },
-    "VectorSpace": {
-        "help": "Free vector space constructor.",
-        "signature": "VectorSpace(R, n)",
-    },
-    "ZZ": {
-        "help": "Sage integer ring.",
-    },
-    "factor": {
-        "help": "Factorization helper in Sage.",
-    },
-    "identity_matrix": {
-        "help": "Construct identity matrix.",
-        "signature": "identity_matrix(*dimensions, **kwargs)",
-    },
-    "sage": {
-        "help": "Sage top-level package namespace.",
-    },
-    "sageall": {
-        "help": "Convenience imports from Sage's unified namespace.",
-    },
-    "vector": {
-        "help": "Construct a Sage vector over a parent module/ring.",
-    },
-    "var": {
-        "help": "Create symbolic variables.",
-    },
-}
+SAGE_MANIFEST_FILE: Final[Path] = Path(
+    resources_files("sage_lsp").joinpath("data", "sage_all_symbols.json")
+)
 
+
+def _load_symbol_manifest() -> dict[str, dict[str, str]]:
+    env_path = os.environ.get("SAGE_LSP_SYMBOL_MANIFEST")
+    manifest_path = Path(env_path) if env_path else SAGE_MANIFEST_FILE
+    if not manifest_path.exists():
+        raise FileNotFoundError(f"Missing Sage symbol manifest at {manifest_path}")
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    raw_symbols = payload.get("symbols")
+    if not isinstance(raw_symbols, list):
+        raise TypeError(f"Invalid manifest schema in {manifest_path}: expected symbols list")
+
+    info: dict[str, dict[str, str]] = {}
+    for item in raw_symbols:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        if not isinstance(name, str) or not name:
+            continue
+
+        details: dict[str, str] = {}
+        help_text = item.get("help")
+        signature_text = item.get("signature")
+        if isinstance(help_text, str):
+            details["help"] = help_text.strip()
+        if isinstance(signature_text, str):
+            details["signature"] = signature_text.strip()
+        info[name] = details
+
+    if not info:
+        raise ValueError(f"Manifest at {manifest_path} contains no readable symbols")
+    return info
+
+
+SAGE_SYMBOL_INFO: Final[dict[str, dict[str, str]]] = _load_symbol_manifest()
 SAGE_SYMBOLS: Final[tuple[str, ...]] = tuple(sorted(SAGE_SYMBOL_INFO))
 
 SAGE_KEYWORDS: Final[tuple[str, ...]] = tuple(

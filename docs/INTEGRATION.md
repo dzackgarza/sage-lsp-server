@@ -71,6 +71,17 @@ Keep a backup before editing in local workflows.
 - verify LSP client status shows `sage-lsp` as active;
 - trigger completion for identifiers like `IntegralLattice`.
 
+## 5) Refresh Sage symbol index
+
+After changing Sage versions, rerun:
+
+```bash
+cd ~/gitclones/sage-lsp-server
+just refresh-sage-manifest
+```
+
+Then restart the server so `sage-lsp` picks up the updated manifest.
+
 ## 5) Legacy extension policy
 
 `jupyterlab-sage-highlighter` is intentionally retained as a no-op shim once

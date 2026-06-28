@@ -64,6 +64,11 @@ def test_hover_shows_sage_doc() -> None:
     assert "IntegralLattice" in result["contents"]["value"]
 
 
+def test_manifest_contains_expanded_sage_symbol_surface() -> None:
+    assert "IntegralLattice" in SAGE_SYMBOLS
+    assert len(SAGE_KEYWORDS) > 1800
+
+
 def test_signature_help_shows_known_sage_signature() -> None:
     doc = Doc("file:///tmp/test.sage", "python", "IntegralLattice(")
     result = pylsp_signature_help(None, None, doc, {"line": 0, "character": 3})

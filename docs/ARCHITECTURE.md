@@ -16,6 +16,8 @@ The flow is:
    `pylsp` plugin entrypoint.
 4. The plugin contributes Sage-aware completion suggestions for matching identifiers and
    lightweight Sage symbol docs/signatures for hover/signature help.
+5. Symbol metadata is loaded from `src/sage_lsp/data/sage_all_symbols.json`, regenerated
+   via `scripts/generate_sage_all_manifest.py`.
 
 ## Completion behavior
 
@@ -38,7 +40,8 @@ LSP surfaces.
 
 - No AST parse.
 - No symbol table or type inference.
-- Completion list is curated; this is a static hint engine only (not full Sage inference).
+- Completion list is derived from the generated `sage.all` export manifest (still a static hint engine,
+  not full Sage inference).
 - No diagnostic reporting.
 - No semantic token generation.
 

@@ -3,11 +3,12 @@
 This repository runs `python-lsp-server` (`pylsp`) as the host and loads a
 Sage extension through the `pylsp` plugin entrypoint.
 
-Current behavior is intentionally narrow:
+Current behavior is now sourced from a generated `sage.all` symbol manifest:
 
-- Sage-aware completion suggestions in `pylsp` for common Sage identifiers (for
-  example, `IntegralLattice`), including symbols imported via `from sage.all import ...`.
-- Sage-specific hover and signature-help hints for catalogued symbols, so `jupyterlab-lsp`
+- Sage-aware completion suggestions in `pylsp` for identifiers exported by `sage.all`
+  (for example, `IntegralLattice`) and for symbols explicitly imported from
+  `sage.all`/`sageall`.
+- Sage-specific hover and signature-help hints for manifested symbols, so `jupyterlab-lsp`
   can show intent directly in the editor.
 - no standalone transport server.
 - no semantic-token generation.
@@ -33,6 +34,8 @@ after the external LSP wiring is in place.
 - `bin/sage-lsp` — tiny bootstrap entrypoint used by `jupyter-lsp`.
 - `scripts/render-config.py` — helper to render JSON config with an absolute
   local `bin/sage-lsp` path.
+- `scripts/generate_sage_all_manifest.py` — refreshes `src/sage_lsp/data/sage_all_symbols.json`
+  from `sage -python`.
 - `config/jupyter-lsp-sage.json` — templated `jupyter-lsp` config.
 - `pyproject.toml` — install metadata and console script.
 
@@ -54,7 +57,9 @@ That config points at `bin/sage-lsp --stdio` and registers language id `sage`.
 `bin/sage-lsp` keeps compatibility with `--stdio` and forwards to `python -m pylsp`
 with `--check-parent-process`.
 
-3. Restart JupyterLab and check `Log`/LSP diagnostics for `sage-lsp`.
+3. Regenerate the manifest when upgrading Sage (`just refresh-sage-manifest`) and
+   commit the updated file.
+4. Restart JupyterLab and check `Log`/LSP diagnostics for `sage-lsp`.
 
 ## Optional kernel metadata alignment
 
@@ -91,12 +96,11 @@ This plugin is a Sage-aware static hint layer on top of `pylsp`:
 
 ## Notes on accuracy and scope
 
-- This package is a practical stopgap for Sage completions, not a full Sage
-  static-analysis engine.
-- It is reliable for completion affordances only; it does not currently provide
-  robust semantic highlighting.
-- A separate parser-aware completion/signature pipeline is still the next step for
-  deep research UX.
+- This package is a practical completion layer for Sage notebooks, not a parser-aware
+  full semantic-analysis engine.
+- It provides broad, manifest-driven completions/hover/signature hints.
+- A deeper parser/type engine for end-to-end symbolic semantics is still the next step
+  for research UX.
 
 ## Verification checklist
 
