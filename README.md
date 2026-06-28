@@ -1,11 +1,14 @@
 # Sage LSP Server
 
-This repository contains a standalone Sage-aware Language Server Protocol (LSP)
-server used for JupyterLab syntax intelligence.
+This repository now runs `python-lsp-server` (`pylsp`) as the host and loads a
+small Sage extension through the `pylsp` plugin entrypoint.
 
-The server is intentionally narrow in scope in this first implementation:
-it provides `textDocument/semanticTokens/full` support and a Sage-aware keyword
-classification layer so Sage-heavy identifiers can be highlighted in notebook cells.
+Current behavior is intentionally narrow:
+
+- Sage-aware completion suggestions in `pylsp` for common Sage identifiers (for
+  example, `IntegralLattice`).
+- no standalone transport server.
+- no semantic-token generation.
 
 ## Why this repo exists
 
@@ -24,7 +27,7 @@ after the external LSP wiring is in place.
 
 ## Repository layout
 
-- `src/sage_lsp/server.py` — LSP implementation and tokenization logic.
+- `src/sage_lsp/server.py` — `pylsp` plugin + completion hook.
 - `bin/sage-lsp` — tiny bootstrap entrypoint used by `jupyter-lsp`.
 - `scripts/render-config.py` — helper to render JSON config with an absolute
   local `bin/sage-lsp` path.
@@ -46,6 +49,8 @@ python3 scripts/render-config.py --output ~/.jupyter/jupyter_server_config.d/sag
 ```
 
 That config points at `bin/sage-lsp --stdio` and registers language id `sage`.
+`bin/sage-lsp` keeps compatibility with `--stdio` and forwards to `python -m pylsp`
+with `--check-parent-process`.
 
 3. Restart JupyterLab and check `Log`/LSP diagnostics for `sage-lsp`.
 
@@ -73,26 +78,20 @@ If you edit this file, restart the notebook server and re-open any active tabs.
 
 ## What the server currently does
 
-- Detects Sage documents by:
-  - language id (`sage`, `sagews`, `sage3`), and
-  - file extension fallback (`.sage`, `.spyx`, `.sws`, `.sagews`).
-- Splits source text with a lightweight identifier tokenizer.
-- Classifies tokens into a `semanticTokens` legend:
-  - keyword-like Sage words
-  - function/class-like identifiers
-  - constructor-like names
-- Returns minimal token modifiers (no style flags yet), letting JupyterLab apply
-  theme colors.
+This plugin is Sage-aware completion-only:
+
+- it detects Sage notebook context using language id (`sage`, `sagews`, `sage3`) or
+  Sage file extensions (`.sage`, `.spyx`, `.sws`, `.sagews`),
+- suggests matching Sage identifiers as completion items.
 
 ## Notes on accuracy and scope
 
-- This server is a practical stopgap for identifier highlighting, not a full
-  Sage static-analysis engine.
-- It is reliable for keyword/class/function name coloring and common Sage symbols
-  like `IntegralLattice`, but it does not replace complete parsing or symbol
-  binding.
-- JupyterLab themes determine final rendering color; this server only emits semantic
-  token types.
+- This package is a practical stopgap for Sage completions, not a full Sage
+  static-analysis engine.
+- It is reliable for completion affordances only; it does not currently provide
+  robust semantic highlighting.
+- A separate parser-aware completion/signature pipeline is still the next step for
+  deep research UX.
 
 ## Verification checklist
 
@@ -100,8 +99,8 @@ If you edit this file, restart the notebook server and re-open any active tabs.
    `~/.jupyter/jupyter_server_config.d/sage-lsp.json`
 2. Confirm kernel metadata contains:
    `language: "sage"` and `metadata.language_info.mimetype: "text/x-sage"`.
-3. Open a Sage cell containing `IntegralLattice` and check token coloring is
-   present from semantic tokens rather than generic code text.
+3. Open a Sage cell containing `IntegralLattice` and check completion behavior
+   includes the Sage symbol.
 
 ## Companion extension note
 
@@ -110,7 +109,7 @@ compatibility shim:
 
 - it loads and no-ops at activation;
 - it does not patch LSP internals anymore;
-- syntax intelligence should come from `sage-lsp` via `jupyter-lsp`.
+- syntax assistance should come from the `python-lsp-server` extension via `jupyter-lsp`.
 
 ## Files to read next
 

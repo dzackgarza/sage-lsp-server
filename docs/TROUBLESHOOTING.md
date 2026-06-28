@@ -5,7 +5,7 @@
 Symptoms:
 
 - no `sage-lsp` process attached in Jupyter logs,
-- semantic token requests never arrive.
+- completion requests from this server never arrive.
 
 Checks:
 
@@ -18,18 +18,19 @@ Checks:
 - confirm `~/.jupyter/jupyter_server_config.d/sage-lsp.json` is valid JSON and points
   to an executable path.
 
-## Sage cells still unhighlighted
+## Sage completions missing
 
 - confirm kernel metadata is Sage (`language: "sage"`).
 - confirm notebook MIME includes `text/x-sage` (or at least `text/x-python`
   fallback remains in config).
-- confirm JupyterLab is not still loading older extension behavior for Sage keyword
-  handling.
+- confirm `jupyter-lsp` command points at `bin/sage-lsp`.
+- check `~/.local/share/jupyter/lsp/lsp.log` (or your server log) for startup
+  trace indicating `pylsp` launch.
 
-## Why full Sage symbol resolution is not possible yet
+## Why full Sage highlighting is still limited
 
-This server does not import Sage internals for symbol tables; it currently uses
-regex + keyword heuristics. That keeps startup reliable but leaves edge cases:
+This server does not import Sage internals for symbol tables; it currently provides
+completion keywords only. That keeps startup reliable but leaves edge cases:
 
 - alias/import confusion,
 - dynamic symbol creation,
@@ -45,4 +46,3 @@ jupyter --paths
 python3 scripts/render-config.py --output /tmp/sage-lsp.json
 cat /tmp/sage-lsp.json
 ```
-

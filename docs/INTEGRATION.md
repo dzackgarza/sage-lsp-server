@@ -19,6 +19,9 @@ python3 scripts/render-config.py --output ~/.jupyter/jupyter_server_config.d/sag
 
 This writes a concrete config with absolute command path and keeps the template in
 `config/jupyter-lsp-sage.json`.
+`sage-lsp` keeps backward compatibility with `--stdio` in generated config.
+
+It launches `python-lsp-server` with the plugin entrypoint installed by this package.
 
 Generated example:
 
@@ -28,7 +31,7 @@ Generated example:
     "language_servers": {
       "sage-lsp": {
         "version": 2,
-        "argv": [".../sage-lsp-server/bin/sage-lsp", "--stdio"],
+        "argv": [".../sage-lsp-server/bin/sage-lsp", "--stdio", "--check-parent-process"],
         "languages": ["sage"],
         "mime_types": ["text/x-sage", "text/x-python"],
         "display_name": "Sage (local)",
@@ -66,10 +69,9 @@ Keep a backup before editing in local workflows.
 - restart the Jupyter server process;
 - open a Sage notebook;
 - verify LSP client status shows `sage-lsp` as active;
-- trigger edits containing identifiers like `IntegralLattice`.
+- trigger completion for identifiers like `IntegralLattice`.
 
 ## 5) Legacy extension policy
 
 `jupyterlab-sage-highlighter` is intentionally retained as a no-op shim once
 external LSP is active. Do not reintroduce frontend patches there.
-

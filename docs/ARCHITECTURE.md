@@ -12,24 +12,18 @@ The flow is:
 1. JupyterLab cell edit is proxied through `jupyterlab-lsp` runtime to
    `jupyter-lsp`.
 2. `jupyter-lsp` starts the server command from config and establishes LSP stdio.
-3. `pygls` receives `textDocument/semanticTokens/full` requests.
-4. The server classifies identifiers in the text and returns encoded semantic
-   token arrays.
+3. `sage-lsp` runs `python -m pylsp` and loads this package through the
+   `pylsp` plugin entrypoint.
+4. The plugin contributes Sage-aware completion suggestions for matching identifiers.
 
-## Tokenization behavior
+## Completion behavior
 
 Current logic is intentionally conservative:
 
-- tokenize using regex: `[A-Za-z_][A-Za-z0-9_]*`
-- classify each identifier by simple heuristics:
-  - exact match in `SAGE_KEYWORDS` -> token type `keyword`
-  - previous token is `class` -> token type `class`
-  - previous token is `def`/`async`/`cdef` -> token type `function`
-  - `self` -> `parameter`
-  - PascalCase -> `class`
-  - all-caps -> `type`
-  - default -> `variable`
-- encode with standard relative-position LSP `SemanticTokens.data`
+- detect Sage context by language id (`sage`, `sagews`, `sage3`) and/or file extension
+  (`.sage`, `.spyx`, `.sws`, `.sagews`);
+- extract token prefix at cursor;
+- return completion items from a keyword list when they match the prefix.
 
 ## Why not LSP patching in the frontend
 
@@ -41,9 +35,9 @@ LSP surfaces.
 
 - No AST parse.
 - No symbol table or type inference.
-- No signature docs / completion engine.
+- Completion list is curated; this is not a signature engine.
 - No diagnostic reporting.
+- No semantic token generation.
 
-The immediate objective is "good enough" keyword and identifier highlighting for
-Sage notebooks, while keeping the path compatible with future extension.
-
+The immediate objective is practical completion assistance for Sage notebooks while
+keeping the path compatible with future extension.

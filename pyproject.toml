@@ -10,12 +10,14 @@ readme = "README.md"
 requires-python = ">=3.10"
 authors = [{name = "Local"}]
 dependencies = [
-  "pygls>=2.1",
-  "lsprotocol>=2025.0.0"
+  "python-lsp-server>=1.14.0"
 ]
 
 [project.scripts]
 sage-lsp = "sage_lsp.__main__:main"
+
+[project.entry-points.pylsp]
+sage = "sage_lsp.server"
 
 [project.urls]
 Homepage = "https://github.com/dzackgarza/local-tools"
