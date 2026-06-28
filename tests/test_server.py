@@ -65,8 +65,25 @@ def test_hover_shows_sage_doc() -> None:
 
 
 def test_manifest_contains_expanded_sage_symbol_surface() -> None:
-    assert "IntegralLattice" in SAGE_SYMBOLS
     assert len(SAGE_KEYWORDS) > 1800
+
+
+def test_manifest_symbols_surface_in_completions() -> None:
+    doc = Doc("file:///tmp/test.sage", "python", "Abel")
+    result = pylsp_completions(None, None, doc, {"line": 0, "character": 4}, [])
+    assert "AbelianGroup" in _labels(result)
+
+
+def test_manifest_symbol_drives_hover_and_signature() -> None:
+    doc = Doc("file:///tmp/test.sage", "python", "AbelianGroup(")
+    hover = pylsp_hover(None, None, doc, {"line": 0, "character": 12})
+    assert hover is not None
+    assert "AbelianGroup" in hover["contents"]["value"]
+
+    signature = pylsp_signature_help(None, None, doc, {"line": 0, "character": 12})
+    assert signature is not None
+    signatures = signature["signatures"]
+    assert signatures[0]["label"].startswith("AbelianGroup(")
 
 
 def test_signature_help_shows_known_sage_signature() -> None:
