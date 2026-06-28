@@ -9,12 +9,9 @@ from urllib.parse import unquote, urlparse
 
 from pylsp import hookimpl, lsp
 
-SAGE_KEYWORDS: Final[tuple[str, ...]] = tuple(
+SAGE_SYMBOLS: Final[tuple[str, ...]] = tuple(
     sorted(
         {
-            # Python base language (for readability in Sage cells)
-            *keyword.kwlist,
-            # Sage-specific constructors and common symbols used in arithmetic geometry workflows
             "Integer",
             "ZZ",
             "QQ",
@@ -42,6 +39,17 @@ SAGE_KEYWORDS: Final[tuple[str, ...]] = tuple(
     )
 )
 
+SAGE_KEYWORDS: Final[tuple[str, ...]] = tuple(
+    sorted(set(keyword.kwlist) | set(SAGE_SYMBOLS))
+)
+
+SAGE_HINT_RE: Final[re.Pattern[str]] = re.compile(
+    r"""(?x)
+    (?:^|[^\w.])(from\s+sageall\s+import|from\s+sage\.all\s+import|import\s+sage|import\s+sageall)\b
+    """,
+    re.IGNORECASE,
+)
+
 SAGE_EXTS: Final[tuple[str, ...]] = (".sage", ".spyx", ".sws", ".sagews")
 SAGE_LANG_IDS: Final[tuple[str, ...]] = ("sage", "sagews", "sage3")
 IDENT_RE: Final[re.Pattern[str]] = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
@@ -61,6 +69,34 @@ def _has_sage_context(document: object) -> bool:
     path = unquote((parsed.path or "").lower())
     if any(path.endswith(ext) for ext in SAGE_EXTS):
         return True
+
+    if path.endswith(".ipynb"):
+        source = getattr(document, "source", "")
+        if isinstance(source, str) and SAGE_HINT_RE.search(source):
+            return True
+
+    return False
+
+
+def _maybe_sage_notebook_context(document: object, prefix: str) -> bool:
+    language_id = str(getattr(document, "language_id", "")).lower()
+    if language_id not in ("", "python"):
+        return False
+
+    uri = str(getattr(document, "uri", ""))
+    uri_lower = uri.lower()
+    parsed = urlparse(uri)
+    path = unquote((parsed.path or "").lower())
+    is_ipynb = uri_lower.endswith(".ipynb") or path.endswith(".ipynb")
+    if not is_ipynb:
+        return False
+
+    source = getattr(document, "source", "")
+    if isinstance(source, str):
+        if SAGE_HINT_RE.search(source):
+            return True
+
+        return any(symbol.startswith(prefix) for symbol in SAGE_SYMBOLS)
 
     return False
 
@@ -99,11 +135,12 @@ def _extract_prefix(document: object, position: dict[str, int] | None) -> str | 
 
 def _completion_items(
     prefix: str,
+    keywords: tuple[str, ...],
     ignore: set[str] | None = None,
 ) -> list[dict[str, object]]:
     ignore = ignore or set()
     suggestions = []
-    for keyword_name in SAGE_KEYWORDS:
+    for keyword_name in keywords:
         if prefix and not keyword_name.startswith(prefix):
             continue
         if keyword_name in ignore:
@@ -126,15 +163,16 @@ def _completion_items(
 def pylsp_completions(config, workspace, document, position, ignored_names):
     del config, workspace
 
-    if not _has_sage_context(document):
-        return None
-
     prefix = _extract_prefix(document, position)
-    if prefix is None:
+    if prefix is None or not prefix:
         return None
 
-    if not prefix:
+    if _has_sage_context(document):
+        keywords = SAGE_KEYWORDS
+    elif _maybe_sage_notebook_context(document, prefix):
+        keywords = SAGE_SYMBOLS
+    else:
         return None
 
     ignore = set(ignored_names or [])
-    return _completion_items(prefix, ignore)
+    return _completion_items(prefix, keywords, ignore)

@@ -3,9 +3,19 @@
     "language_servers": {
       "sage-lsp": {
         "version": 2,
-        "argv": ["/ABSOLUTE/PATH/TO/sage-lsp", "--stdio", "--check-parent-process"],
-        "languages": ["sage"],
-        "mime_types": ["text/x-sage", "text/x-python"],
+        "argv": [
+          "/ABSOLUTE/PATH/TO/sage-lsp",
+          "--stdio",
+          "--check-parent-process"
+        ],
+        "languages": [
+          "python",
+          "sage"
+        ],
+        "mime_types": [
+          "text/x-sage",
+          "text/x-python"
+        ],
         "display_name": "Sage (local)",
         "requires_documents_on_disk": false
       }

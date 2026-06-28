@@ -21,9 +21,11 @@ The flow is:
 Current logic is intentionally conservative:
 
 - detect Sage context by language id (`sage`, `sagews`, `sage3`) and/or file extension
-  (`.sage`, `.spyx`, `.sws`, `.sagews`);
+- (`.sage`, `.spyx`, `.sws`, `.sagews`),
 - extract token prefix at cursor;
-- return completion items from a keyword list when they match the prefix.
+- if that is not conclusive, treat Python-marked notebook documents (`.ipynb`) as "possibly Sage"
+  only when a Sage import marker is present or the typed prefix matches a Sage symbol.
+- return completion items from the Sage symbol list or full keyword list when they match the prefix.
 
 ## Why not LSP patching in the frontend
 

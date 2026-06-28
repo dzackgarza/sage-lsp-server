@@ -81,7 +81,10 @@ If you edit this file, restart the notebook server and re-open any active tabs.
 This plugin is Sage-aware completion-only:
 
 - it detects Sage notebook context using language id (`sage`, `sagews`, `sage3`) or
-  Sage file extensions (`.sage`, `.spyx`, `.sws`, `.sagews`),
+  Sage file extensions (`.sage`, `.spyx`, `.sws`, `.sagews`);
+- for Python-labeled notebook documents (`.ipynb`), it only surfaces Sage symbols when
+  either a Sage import marker is present or the active prefix matches a known Sage
+  identifier (this avoids turning every Python notebook into a Sage completion bucket);
 - suggests matching Sage identifiers as completion items.
 
 ## Notes on accuracy and scope
