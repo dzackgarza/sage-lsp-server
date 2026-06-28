@@ -10,6 +10,8 @@ from sage_lsp.server import (
     _has_sage_context,
     _maybe_sage_notebook_context,
     pylsp_completions,
+    pylsp_hover,
+    pylsp_signature_help,
 )
 
 
@@ -53,3 +55,19 @@ def test_python_notebook_marker_triggers_full_coverage() -> None:
     assert _maybe_sage_notebook_context(doc, "imp") is True
     result = pylsp_completions(None, None, doc, {"line": 1, "character": 3}, [])
     assert "import" in _labels(result)
+
+
+def test_hover_shows_sage_doc() -> None:
+    doc = Doc("file:///tmp/test.sage", "python", "IntegralLattice(")
+    result = pylsp_hover(None, None, doc, {"line": 0, "character": 3})
+    assert result is not None
+    assert "IntegralLattice" in result["contents"]["value"]
+
+
+def test_signature_help_shows_known_sage_signature() -> None:
+    doc = Doc("file:///tmp/test.sage", "python", "IntegralLattice(")
+    result = pylsp_signature_help(None, None, doc, {"line": 0, "character": 3})
+    assert result is not None
+    signatures = result["signatures"]
+    assert len(signatures) == 1
+    assert signatures[0]["label"].startswith("IntegralLattice")

@@ -14,7 +14,8 @@ The flow is:
 2. `jupyter-lsp` starts the server command from config and establishes LSP stdio.
 3. `sage-lsp` runs `python -m pylsp` and loads this package through the
    `pylsp` plugin entrypoint.
-4. The plugin contributes Sage-aware completion suggestions for matching identifiers.
+4. The plugin contributes Sage-aware completion suggestions for matching identifiers and
+   lightweight Sage symbol docs/signatures for hover/signature help.
 
 ## Completion behavior
 
@@ -37,7 +38,7 @@ LSP surfaces.
 
 - No AST parse.
 - No symbol table or type inference.
-- Completion list is curated; this is not a signature engine.
+- Completion list is curated; this is a static hint engine only (not full Sage inference).
 - No diagnostic reporting.
 - No semantic token generation.
 

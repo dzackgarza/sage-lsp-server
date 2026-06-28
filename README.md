@@ -1,12 +1,14 @@
 # Sage LSP Server
 
-This repository now runs `python-lsp-server` (`pylsp`) as the host and loads a
-small Sage extension through the `pylsp` plugin entrypoint.
+This repository runs `python-lsp-server` (`pylsp`) as the host and loads a
+Sage extension through the `pylsp` plugin entrypoint.
 
 Current behavior is intentionally narrow:
 
 - Sage-aware completion suggestions in `pylsp` for common Sage identifiers (for
-  example, `IntegralLattice`).
+  example, `IntegralLattice`), including symbols imported via `from sage.all import ...`.
+- Sage-specific hover and signature-help hints for catalogued symbols, so `jupyterlab-lsp`
+  can show intent directly in the editor.
 - no standalone transport server.
 - no semantic-token generation.
 
@@ -78,7 +80,7 @@ If you edit this file, restart the notebook server and re-open any active tabs.
 
 ## What the server currently does
 
-This plugin is Sage-aware completion-only:
+This plugin is a Sage-aware static hint layer on top of `pylsp`:
 
 - it detects Sage notebook context using language id (`sage`, `sagews`, `sage3`) or
   Sage file extensions (`.sage`, `.spyx`, `.sws`, `.sagews`);
