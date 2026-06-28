@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import importlib
+import json
 from dataclasses import dataclass
+import os
+from pathlib import Path
+from importlib import import_module
+
+import pytest
 
 from sage_lsp.server import (
     SAGE_KEYWORDS,
-    SAGE_SYMBOLS,
     _has_sage_context,
     _maybe_sage_notebook_context,
     pylsp_completions,
@@ -93,3 +99,82 @@ def test_signature_help_shows_known_sage_signature() -> None:
     signatures = result["signatures"]
     assert len(signatures) == 1
     assert signatures[0]["label"].startswith("IntegralLattice")
+
+
+def test_import_statement_expands_manifest_symbols_in_scope(tmp_path: Path) -> None:
+    doc = Doc(
+        "file:///tmp/test.sage",
+        "python",
+        "from sage.all import AbelianGroup\nAbel",
+    )
+    result = pylsp_completions(None, None, doc, {"line": 1, "character": 4}, [])
+    assert "AbelianGroup" in _labels(result)
+
+
+def test_custom_manifest_override_is_honored(tmp_path: Path) -> None:
+    manifest = tmp_path / "sage_all_symbols.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "symbols": [
+                    {
+                        "name": "CustomManifestSymbol",
+                        "help": "Temporary symbol from test manifest.",
+                        "signature": "CustomManifestSymbol(x)",
+                    }
+                ]
+            }
+        )
+        + "\n"
+    )
+
+    previous = os.environ.get("SAGE_LSP_SYMBOL_MANIFEST")
+    os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = str(manifest)
+    try:
+        custom_server = importlib.reload(import_module("sage_lsp.server"))
+        assert "CustomManifestSymbol" in custom_server.SAGE_SYMBOLS
+
+        doc = Doc(
+            "file:///tmp/test.sage",
+            "python",
+            "CustomManifestSymbol(",
+        )
+        result = custom_server.pylsp_completions(
+            None,
+            None,
+            doc,
+            {"line": 0, "character": len("CustomManifestSymbol")},
+            [],
+        )
+        assert "CustomManifestSymbol" in _labels(result)
+
+        signature = custom_server.pylsp_signature_help(
+            None,
+            None,
+            doc,
+            {"line": 0, "character": len("CustomManifestSymbol")},
+        )
+        assert signature is not None
+        assert signature["signatures"][0]["label"].startswith("CustomManifestSymbol(")
+    finally:
+        if previous is None:
+            os.environ.pop("SAGE_LSP_SYMBOL_MANIFEST", None)
+        else:
+            os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = previous
+        importlib.reload(import_module("sage_lsp.server"))
+
+
+def test_invalid_symbol_manifest_path_fails_fast(tmp_path: Path) -> None:
+    missing = tmp_path / "does-not-exist-symbols.json"
+
+    previous = os.environ.get("SAGE_LSP_SYMBOL_MANIFEST")
+    os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = str(missing)
+    try:
+        with pytest.raises(FileNotFoundError, match="Missing Sage symbol manifest"):
+            importlib.reload(import_module("sage_lsp.server"))
+    finally:
+        if previous is None:
+            os.environ.pop("SAGE_LSP_SYMBOL_MANIFEST", None)
+        else:
+            os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = previous
+        importlib.reload(import_module("sage_lsp.server"))
