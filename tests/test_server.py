@@ -13,7 +13,9 @@ import pytest
 
 from sage_lsp.server import (
     SAGE_KEYWORDS,
+    SAGE_SYMBOLS,
     _has_sage_context,
+    _extract_imported_sage_symbols,
     _maybe_sage_notebook_context,
     pylsp_completions,
     pylsp_hover,
@@ -111,6 +113,16 @@ def test_import_statement_expands_manifest_symbols_in_scope(tmp_path: Path) -> N
     assert "AbelianGroup" in _labels(result)
 
 
+def test_import_star_expands_all_manifest_symbols_in_scope() -> None:
+    doc = Doc(
+        "file:///tmp/test.sage",
+        "python",
+        "from sage.all import *\nAbel",
+    )
+    imported = _extract_imported_sage_symbols(doc)
+    assert imported == set(SAGE_SYMBOLS)
+
+
 def test_custom_manifest_override_is_honored(tmp_path: Path) -> None:
     manifest = tmp_path / "sage_all_symbols.json"
     manifest.write_text(
@@ -171,6 +183,40 @@ def test_invalid_symbol_manifest_path_fails_fast(tmp_path: Path) -> None:
     os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = str(missing)
     try:
         with pytest.raises(FileNotFoundError, match="Missing Sage symbol manifest"):
+            importlib.reload(import_module("sage_lsp.server"))
+    finally:
+        if previous is None:
+            os.environ.pop("SAGE_LSP_SYMBOL_MANIFEST", None)
+        else:
+            os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = previous
+        importlib.reload(import_module("sage_lsp.server"))
+
+
+def test_invalid_symbol_manifest_schema_fails_fast(tmp_path: Path) -> None:
+    manifest = tmp_path / "sage_all_symbols.json"
+    manifest.write_text(json.dumps({"symbols": {"name": "not-a-list"}}))
+
+    previous = os.environ.get("SAGE_LSP_SYMBOL_MANIFEST")
+    os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = str(manifest)
+    try:
+        with pytest.raises(TypeError, match="Invalid manifest schema"):
+            importlib.reload(import_module("sage_lsp.server"))
+    finally:
+        if previous is None:
+            os.environ.pop("SAGE_LSP_SYMBOL_MANIFEST", None)
+        else:
+            os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = previous
+        importlib.reload(import_module("sage_lsp.server"))
+
+
+def test_manifest_with_no_readable_symbols_fails_fast(tmp_path: Path) -> None:
+    manifest = tmp_path / "sage_all_symbols.json"
+    manifest.write_text(json.dumps({"symbols": [123, None, {"help": "no symbol name"}]}))
+
+    previous = os.environ.get("SAGE_LSP_SYMBOL_MANIFEST")
+    os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = str(manifest)
+    try:
+        with pytest.raises(ValueError, match="contains no readable symbols"):
             importlib.reload(import_module("sage_lsp.server"))
     finally:
         if previous is None:
