@@ -6,16 +6,15 @@ import json
 import keyword
 import os
 import re
-from pathlib import Path
+from collections.abc import Sequence
 from importlib.resources import files as resources_files
-from typing import Final
+from pathlib import Path
+from typing import Final, Protocol, runtime_checkable
 from urllib.parse import unquote, urlparse
 
 from pylsp import hookimpl, lsp
 
-SAGE_MANIFEST_FILE: Final[Path] = Path(
-    resources_files("sage_lsp").joinpath("data", "sage_all_symbols.json")
-)
+SAGE_MANIFEST_FILE: Final[Path] = Path(str(resources_files("sage_lsp").joinpath("data", "sage_all_symbols.json")))
 
 
 def _load_symbol_manifest() -> dict[str, dict[str, str]]:
@@ -53,9 +52,7 @@ def _load_symbol_manifest() -> dict[str, dict[str, str]]:
 SAGE_SYMBOL_INFO: Final[dict[str, dict[str, str]]] = _load_symbol_manifest()
 SAGE_SYMBOLS: Final[tuple[str, ...]] = tuple(sorted(SAGE_SYMBOL_INFO))
 
-SAGE_KEYWORDS: Final[tuple[str, ...]] = tuple(
-    sorted(set(keyword.kwlist) | set(SAGE_SYMBOLS))
-)
+SAGE_KEYWORDS: Final[tuple[str, ...]] = tuple(sorted(set(keyword.kwlist) | set(SAGE_SYMBOLS)))
 
 SAGE_HINT_RE: Final[re.Pattern[str]] = re.compile(
     r"""(?x)
@@ -66,6 +63,31 @@ SAGE_HINT_RE: Final[re.Pattern[str]] = re.compile(
 
 SAGE_EXTS: Final[tuple[str, ...]] = (".sage", ".spyx", ".sws", ".sagews")
 SAGE_LANG_IDS: Final[tuple[str, ...]] = ("sage", "sagews", "sage3")
+
+
+@runtime_checkable
+class _TextDocument(Protocol):
+    """What every pylsp text document guarantees."""
+
+    uri: str
+
+    @property
+    def source(self) -> str: ...
+
+
+@runtime_checkable
+class _LanguageTagged(Protocol):
+    """Notebook cells declare a language id; plain documents do not."""
+
+    language_id: str | None
+
+
+def _declared_language(document: object) -> str:
+    if isinstance(document, _LanguageTagged) and document.language_id is not None:
+        return str(document.language_id).lower()
+    return ""
+
+
 IDENT_RE: Final[re.Pattern[str]] = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 SAGE_IMPORT_RE: Final[re.Pattern[str]] = re.compile(
     r"^\s*from\s+(?:sage\.all|sageall)\s+import\s+(.+)$",
@@ -73,12 +95,11 @@ SAGE_IMPORT_RE: Final[re.Pattern[str]] = re.compile(
 )
 
 
-def _has_sage_context(document: object) -> bool:
-    language_id = getattr(document, "language_id", None)
-    if language_id and str(language_id).lower() in SAGE_LANG_IDS:
+def _has_sage_context(document: _TextDocument) -> bool:
+    if _declared_language(document) in SAGE_LANG_IDS:
         return True
 
-    uri = str(getattr(document, "uri", ""))
+    uri = str(document.uri)
     uri_lower = uri.lower()
     if any(uri_lower.endswith(ext) for ext in SAGE_EXTS):
         return True
@@ -89,22 +110,22 @@ def _has_sage_context(document: object) -> bool:
         return True
 
     if path.endswith(".ipynb"):
-        source = getattr(document, "source", "")
-        if isinstance(source, str) and SAGE_HINT_RE.search(source):
+        source = document.source
+        if SAGE_HINT_RE.search(source):
             return True
 
     return False
 
 
-def _is_sage_symbol_context(document: object, prefix: str) -> bool:
+def _is_sage_symbol_context(document: _TextDocument, prefix: str) -> bool:
     if _has_sage_context(document):
         return True
     return _maybe_sage_notebook_context(document, prefix)
 
 
-def _extract_imported_sage_symbols(document: object) -> set[str]:
-    source = getattr(document, "source", "")
-    if not isinstance(source, str) or not source.strip():
+def _extract_imported_sage_symbols(document: _TextDocument) -> set[str]:
+    source = document.source
+    if not source.strip():
         return set()
 
     symbols = set()
@@ -128,7 +149,7 @@ def _extract_imported_sage_symbols(document: object) -> set[str]:
     return symbols
 
 
-def _word_at_position(document: object, position: dict[str, int] | None) -> str | None:
+def _word_at_position(document: _TextDocument, position: dict[str, int] | None) -> str | None:
     if position is None:
         return None
 
@@ -137,10 +158,7 @@ def _word_at_position(document: object, position: dict[str, int] | None) -> str 
     if not isinstance(line_index, int) or not isinstance(char_index, int):
         return None
 
-    source = getattr(document, "source", "")
-    if not isinstance(source, str):
-        return None
-
+    source = document.source
     lines = source.splitlines()
     if line_index < 0 or line_index >= len(lines):
         return None
@@ -158,12 +176,12 @@ def _word_at_position(document: object, position: dict[str, int] | None) -> str 
     return None
 
 
-def _maybe_sage_notebook_context(document: object, prefix: str) -> bool:
-    language_id = str(getattr(document, "language_id", "")).lower()
+def _maybe_sage_notebook_context(document: _TextDocument, prefix: str) -> bool:
+    language_id = _declared_language(document)
     if language_id not in ("", "python"):
         return False
 
-    uri = str(getattr(document, "uri", ""))
+    uri = str(document.uri)
     uri_lower = uri.lower()
     parsed = urlparse(uri)
     path = unquote((parsed.path or "").lower())
@@ -171,17 +189,14 @@ def _maybe_sage_notebook_context(document: object, prefix: str) -> bool:
     if not is_ipynb:
         return False
 
-    source = getattr(document, "source", "")
-    if isinstance(source, str):
-        if SAGE_HINT_RE.search(source):
-            return True
+    source = document.source
+    if SAGE_HINT_RE.search(source):
+        return True
 
-        return any(symbol.startswith(prefix) for symbol in SAGE_SYMBOLS)
-
-    return False
+    return any(symbol.startswith(prefix) for symbol in SAGE_SYMBOLS)
 
 
-def _extract_prefix(document: object, position: dict[str, int] | None) -> str | None:
+def _extract_prefix(document: _TextDocument, position: dict[str, int] | None) -> str | None:
     if position is None:
         return None
 
@@ -190,10 +205,7 @@ def _extract_prefix(document: object, position: dict[str, int] | None) -> str | 
     if not isinstance(line_index, int) or not isinstance(char_index, int):
         return None
 
-    source = getattr(document, "source", "")
-    if not isinstance(source, str):
-        return None
-
+    source = document.source
     lines = source.splitlines()
     if line_index < 0 or line_index >= len(lines):
         return None
@@ -226,8 +238,11 @@ def _completion_items(
         if keyword_name in ignore:
             continue
 
-        metadata = SAGE_SYMBOL_INFO.get(keyword_name, {})
-        details = metadata.get("help", f"Sage keyword: `{keyword_name}`")
+        metadata = SAGE_SYMBOL_INFO.get(keyword_name)
+        if metadata is not None and "help" in metadata:
+            details = metadata["help"]
+        else:
+            details = f"Sage keyword: `{keyword_name}`"
         suggestions.append(
             {
                 "label": keyword_name,
@@ -245,7 +260,7 @@ def _completion_items(
 
 
 @hookimpl
-def pylsp_settings():
+def pylsp_settings() -> dict[str, object]:
     # This server owns linting end to end: Sage documents lint on their
     # lowered Python with mapped positions (sage_lsp.lint), plain Python
     # documents lint directly through the same hook.  The stock lint
@@ -262,14 +277,20 @@ def pylsp_settings():
 
 
 @hookimpl
-def pylsp_lint(config, workspace, document, is_saved):
+def pylsp_lint(config: object, workspace: object, document: _TextDocument, is_saved: bool) -> list[dict[str, object]]:
     from sage_lsp.lint import lint_document
 
     return lint_document(document)
 
 
 @hookimpl
-def pylsp_completions(config, workspace, document, position, ignored_names):
+def pylsp_completions(
+    config: object,
+    workspace: object,
+    document: _TextDocument,
+    position: dict[str, int] | None,
+    ignored_names: Sequence[str] | None,
+) -> list[dict[str, object]] | None:
     del config, workspace
 
     prefix = _extract_prefix(document, position)
@@ -283,13 +304,18 @@ def pylsp_completions(config, workspace, document, position, ignored_names):
     else:
         return None
 
-    ignore = set(ignored_names or [])
+    ignore = set(ignored_names) if ignored_names is not None else set()
     keywords = tuple(sorted(set(keywords).union(_extract_imported_sage_symbols(document))))
     return _completion_items(prefix, keywords, ignore)
 
 
 @hookimpl
-def pylsp_hover(config, workspace, document, position):
+def pylsp_hover(
+    config: object,
+    workspace: object,
+    document: _TextDocument,
+    position: dict[str, int] | None,
+) -> dict[str, object] | None:
     del config, workspace
 
     symbol = _word_at_position(document, position)
@@ -303,7 +329,7 @@ def pylsp_hover(config, workspace, document, position):
     if not metadata:
         return None
 
-    details = metadata.get("help", f"Sage symbol `{symbol}`.")
+    details = metadata["help"] if "help" in metadata else f"Sage symbol `{symbol}`."
     signature = metadata.get("signature")
     if signature:
         contents = f"```python\n{signature}\n```\n\n{details}"
@@ -314,7 +340,12 @@ def pylsp_hover(config, workspace, document, position):
 
 
 @hookimpl
-def pylsp_signature_help(config, workspace, document, position):
+def pylsp_signature_help(
+    config: object,
+    workspace: object,
+    document: _TextDocument,
+    position: dict[str, int] | None,
+) -> dict[str, object] | None:
     del config, workspace
 
     symbol = _word_at_position(document, position)
@@ -338,7 +369,7 @@ def pylsp_signature_help(config, workspace, document, position):
                 "label": signature,
                 "documentation": {
                     "kind": "markdown",
-                    "value": metadata.get("help", f"Sage symbol `{symbol}`."),
+                    "value": (metadata["help"] if "help" in metadata else f"Sage symbol `{symbol}`."),
                 },
                 "parameters": [],
             }
