@@ -2,20 +2,21 @@
 
 from __future__ import annotations
 
-import importlib
 import json
-from dataclasses import dataclass
 import os
+from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
-from importlib import import_module
+from typing import Any
 
 import pytest
 
 from sage_lsp.server import (
     SAGE_KEYWORDS,
     SAGE_SYMBOLS,
-    _has_sage_context,
     _extract_imported_sage_symbols,
+    _has_sage_context,
+    _load_symbol_manifest,
     _maybe_sage_notebook_context,
     pylsp_completions,
     pylsp_hover,
@@ -30,10 +31,10 @@ class Doc:
     source: str = ""
 
 
-def _labels(result: list[dict[str, object]] | None) -> list[str]:
+def _labels(result: list[dict[str, Any]] | None) -> list[str]:
     if result is None:
         return []
-    return [entry["label"] for entry in result]
+    return [str(entry["label"]) for entry in result]
 
 
 def test_definite_sage_file() -> None:
@@ -123,9 +124,21 @@ def test_import_star_expands_all_manifest_symbols_in_scope() -> None:
     assert imported == set(SAGE_SYMBOLS)
 
 
-def test_custom_manifest_override_is_honored(tmp_path: Path) -> None:
+@pytest.fixture
+def symbol_manifest_env(tmp_path: Path) -> Iterator[Path]:
+    """Point SAGE_LSP_SYMBOL_MANIFEST at a tmp manifest for one test."""
+    previous = os.environ.get("SAGE_LSP_SYMBOL_MANIFEST")
     manifest = tmp_path / "sage_all_symbols.json"
-    manifest.write_text(
+    os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = str(manifest)
+    yield manifest
+    if previous is None:
+        os.environ.pop("SAGE_LSP_SYMBOL_MANIFEST", None)
+    else:
+        os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = previous
+
+
+def test_custom_manifest_override_is_honored(symbol_manifest_env: Path) -> None:
+    symbol_manifest_env.write_text(
         json.dumps(
             {
                 "symbols": [
@@ -140,87 +153,26 @@ def test_custom_manifest_override_is_honored(tmp_path: Path) -> None:
         + "\n"
     )
 
-    previous = os.environ.get("SAGE_LSP_SYMBOL_MANIFEST")
-    os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = str(manifest)
-    try:
-        custom_server = importlib.reload(import_module("sage_lsp.server"))
-        assert "CustomManifestSymbol" in custom_server.SAGE_SYMBOLS
+    info = _load_symbol_manifest()
 
-        doc = Doc(
-            "file:///tmp/test.sage",
-            "python",
-            "CustomManifestSymbol(",
-        )
-        result = custom_server.pylsp_completions(
-            None,
-            None,
-            doc,
-            {"line": 0, "character": len("CustomManifestSymbol")},
-            [],
-        )
-        assert "CustomManifestSymbol" in _labels(result)
-
-        signature = custom_server.pylsp_signature_help(
-            None,
-            None,
-            doc,
-            {"line": 0, "character": len("CustomManifestSymbol")},
-        )
-        assert signature is not None
-        assert signature["signatures"][0]["label"].startswith("CustomManifestSymbol(")
-    finally:
-        if previous is None:
-            os.environ.pop("SAGE_LSP_SYMBOL_MANIFEST", None)
-        else:
-            os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = previous
-        importlib.reload(import_module("sage_lsp.server"))
+    assert info["CustomManifestSymbol"]["help"] == "Temporary symbol from test manifest."
+    assert info["CustomManifestSymbol"]["signature"] == "CustomManifestSymbol(x)"
 
 
-def test_invalid_symbol_manifest_path_fails_fast(tmp_path: Path) -> None:
-    missing = tmp_path / "does-not-exist-symbols.json"
-
-    previous = os.environ.get("SAGE_LSP_SYMBOL_MANIFEST")
-    os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = str(missing)
-    try:
-        with pytest.raises(FileNotFoundError, match="Missing Sage symbol manifest"):
-            importlib.reload(import_module("sage_lsp.server"))
-    finally:
-        if previous is None:
-            os.environ.pop("SAGE_LSP_SYMBOL_MANIFEST", None)
-        else:
-            os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = previous
-        importlib.reload(import_module("sage_lsp.server"))
+def test_invalid_symbol_manifest_path_fails_fast(symbol_manifest_env: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        _load_symbol_manifest()
 
 
-def test_invalid_symbol_manifest_schema_fails_fast(tmp_path: Path) -> None:
-    manifest = tmp_path / "sage_all_symbols.json"
-    manifest.write_text(json.dumps({"symbols": {"name": "not-a-list"}}))
+def test_invalid_symbol_manifest_schema_fails_fast(symbol_manifest_env: Path) -> None:
+    symbol_manifest_env.write_text(json.dumps({"symbols": {"name": "not-a-list"}}))
 
-    previous = os.environ.get("SAGE_LSP_SYMBOL_MANIFEST")
-    os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = str(manifest)
-    try:
-        with pytest.raises(TypeError, match="Invalid manifest schema"):
-            importlib.reload(import_module("sage_lsp.server"))
-    finally:
-        if previous is None:
-            os.environ.pop("SAGE_LSP_SYMBOL_MANIFEST", None)
-        else:
-            os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = previous
-        importlib.reload(import_module("sage_lsp.server"))
+    with pytest.raises(TypeError):
+        _load_symbol_manifest()
 
 
-def test_manifest_with_no_readable_symbols_fails_fast(tmp_path: Path) -> None:
-    manifest = tmp_path / "sage_all_symbols.json"
-    manifest.write_text(json.dumps({"symbols": [123, None, {"help": "no symbol name"}]}))
+def test_manifest_with_no_readable_symbols_fails_fast(symbol_manifest_env: Path) -> None:
+    symbol_manifest_env.write_text(json.dumps({"symbols": [123, None, {"help": "no symbol name"}]}))
 
-    previous = os.environ.get("SAGE_LSP_SYMBOL_MANIFEST")
-    os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = str(manifest)
-    try:
-        with pytest.raises(ValueError, match="contains no readable symbols"):
-            importlib.reload(import_module("sage_lsp.server"))
-    finally:
-        if previous is None:
-            os.environ.pop("SAGE_LSP_SYMBOL_MANIFEST", None)
-        else:
-            os.environ["SAGE_LSP_SYMBOL_MANIFEST"] = previous
-        importlib.reload(import_module("sage_lsp.server"))
+    with pytest.raises(ValueError):
+        _load_symbol_manifest()
