@@ -9,7 +9,7 @@ import re
 from collections.abc import Sequence
 from importlib.resources import files as resources_files
 from pathlib import Path
-from typing import Final, Protocol, runtime_checkable
+from typing import Any, Final, Protocol, runtime_checkable
 from urllib.parse import unquote, urlparse
 
 from pylsp import hookimpl, lsp
@@ -229,7 +229,7 @@ def _completion_items(
     prefix: str,
     keywords: tuple[str, ...],
     ignore: set[str] | None = None,
-) -> list[dict[str, object]]:
+) -> list[dict[str, Any]]:
     ignore = ignore or set()
     suggestions = []
     for keyword_name in keywords:
@@ -260,7 +260,7 @@ def _completion_items(
 
 
 @hookimpl
-def pylsp_settings() -> dict[str, object]:
+def pylsp_settings() -> dict[str, Any]:
     # This server owns linting end to end: Sage documents lint on their
     # lowered Python with mapped positions (sage_lsp.lint), plain Python
     # documents lint directly through the same hook.  The stock lint
@@ -277,7 +277,7 @@ def pylsp_settings() -> dict[str, object]:
 
 
 @hookimpl
-def pylsp_lint(config: object, workspace: object, document: _TextDocument, is_saved: object) -> list[dict[str, object]]:
+def pylsp_lint(config: object, workspace: object, document: _TextDocument, is_saved: object) -> list[dict[str, Any]]:
     from sage_lsp.lint import lint_document
 
     return lint_document(document)
@@ -290,7 +290,7 @@ def pylsp_completions(
     document: _TextDocument,
     position: dict[str, int] | None,
     ignored_names: Sequence[str] | None,
-) -> list[dict[str, object]] | None:
+) -> list[dict[str, Any]] | None:
     del config, workspace
 
     prefix = _extract_prefix(document, position)
@@ -315,7 +315,7 @@ def pylsp_hover(
     workspace: object,
     document: _TextDocument,
     position: dict[str, int] | None,
-) -> dict[str, object] | None:
+) -> dict[str, Any] | None:
     del config, workspace
 
     symbol = _word_at_position(document, position)
@@ -345,7 +345,7 @@ def pylsp_signature_help(
     workspace: object,
     document: _TextDocument,
     position: dict[str, int] | None,
-) -> dict[str, object] | None:
+) -> dict[str, Any] | None:
     del config, workspace
 
     symbol = _word_at_position(document, position)

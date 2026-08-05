@@ -4,6 +4,7 @@ src/sage_lsp/__init__.py
 src/sage_lsp/__main__.py
 src/sage_lsp/lint.py
 src/sage_lsp/preprocess.py
+src/sage_lsp/py.typed
 src/sage_lsp/server.py
 src/sage_lsp.egg-info/PKG-INFO
 src/sage_lsp.egg-info/SOURCES.txt
