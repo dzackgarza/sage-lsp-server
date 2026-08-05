@@ -245,6 +245,30 @@ def _completion_items(
 
 
 @hookimpl
+def pylsp_settings():
+    # This server owns linting end to end: Sage documents lint on their
+    # lowered Python with mapped positions (sage_lsp.lint), plain Python
+    # documents lint directly through the same hook.  The stock lint
+    # plugins would re-lint raw Sage source and re-introduce the noise.
+    return {
+        "plugins": {
+            "pyflakes": {"enabled": False},
+            "pycodestyle": {"enabled": False},
+            "mccabe": {"enabled": False},
+            "autopep8": {"enabled": False},
+            "yapf": {"enabled": False},
+        }
+    }
+
+
+@hookimpl
+def pylsp_lint(config, workspace, document, is_saved):
+    from sage_lsp.lint import lint_document
+
+    return lint_document(document)
+
+
+@hookimpl
 def pylsp_completions(config, workspace, document, position, ignored_names):
     del config, workspace
 

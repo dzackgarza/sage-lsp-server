@@ -10,7 +10,14 @@ readme = "README.md"
 requires-python = ">=3.10"
 authors = [{name = "Local"}]
 dependencies = [
-  "python-lsp-server>=1.14.0"
+  "python-lsp-server>=1.14.0",
+  "pyflakes",
+  "pycodestyle",
+  # The SagePython compiler (sage-free core of the research preamble)
+  # and its grammar; workspace-local direct references.
+  "dzack-research-preamble @ file:///home/dzack/research/src/dzack_research/preamble",
+  "tree-sitter",
+  "tree-sitter-sage @ file:///home/dzack/gitclones/tree-sitter-sage",
 ]
 
 [project.scripts]
@@ -20,4 +27,4 @@ sage-lsp = "sage_lsp.__main__:main"
 sage = "sage_lsp.server"
 
 [project.urls]
-Homepage = "https://github.com/dzackgarza/local-tools"
+Homepage = "https://github.com/dzackgarza/sage-lsp-server"

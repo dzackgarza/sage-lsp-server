@@ -1,0 +1,137 @@
+Metadata-Version: 2.4
+Name: sage-lsp
+Version: 0.1.0
+Summary: Sage-aware Language Server Protocol server for JupyterLab syntax intelligence
+Author: Local
+Project-URL: Homepage, https://github.com/dzackgarza/local-tools
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: python-lsp-server>=1.14.0
+
+# Sage LSP Server
+
+This repository runs `python-lsp-server` (`pylsp`) as the host and loads a
+Sage extension through the `pylsp` plugin entrypoint.
+
+Current behavior is now sourced from a generated `sage.all` symbol manifest:
+
+- Sage-aware completion suggestions in `pylsp` for identifiers exported by `sage.all`
+  (for example, `IntegralLattice`) and for symbols explicitly imported from
+  `sage.all`/`sageall`.
+- Sage-specific hover and signature-help hints for manifested symbols, so `jupyterlab-lsp`
+  can show intent directly in the editor.
+- no standalone transport server.
+- no semantic-token generation.
+
+## Why this repo exists
+
+Earlier attempts to make Sage cells look correct in JupyterLab focused on
+overriding JupyterLab codemirror adapters inside a UI extension. That path is
+fragile and ends up fighting the frontend integration points.
+
+This repo moves the work to the correct layer:
+
+- keep frontend extensions lean,
+- keep keyword/identifier inference in an LSP server,
+- keep JupyterLab-to-LSP wiring explicit in one config file.
+
+The previous `jupyterlab-sage-highlighter` extension was reduced to a no-op shim
+after the external LSP wiring is in place.
+
+## Repository layout
+
+- `src/sage_lsp/server.py` — `pylsp` plugin + completion hook.
+- `bin/sage-lsp` — tiny bootstrap entrypoint used by `jupyter-lsp`.
+- `scripts/render-config.py` — helper to render JSON config with an absolute
+  local `bin/sage-lsp` path.
+- `scripts/generate_sage_all_manifest.py` — refreshes `src/sage_lsp/data/sage_all_symbols.json`
+  from `sage -python`.
+- `config/jupyter-lsp-sage.json` — templated `jupyter-lsp` config.
+- `pyproject.toml` — install metadata and console script.
+
+## Install and register
+
+1. Install editable:
+
+```bash
+python3 -m pip install -e .
+```
+
+2. Render and install jupyter-lsp config:
+
+```bash
+python3 scripts/render-config.py --output ~/.jupyter/jupyter_server_config.d/sage-lsp.json
+```
+
+That config points at `bin/sage-lsp --stdio` and registers language id `sage`.
+`bin/sage-lsp` keeps compatibility with `--stdio` and forwards to `python -m pylsp`
+with `--check-parent-process`.
+
+3. Regenerate the manifest when upgrading Sage (`just refresh-sage-manifest`) and
+   commit the updated file.
+4. Restart JupyterLab and check `Log`/LSP diagnostics for `sage-lsp`.
+
+## Optional kernel metadata alignment
+
+For deterministic attachment of this server to Sage notebooks, the kernel should
+identify as Sage language text with MIME type `text/x-sage`.
+
+```bash
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+path = Path.home()/'.local/share/jupyter/kernels/sagemath/kernel.json'
+data = json.loads(path.read_text())
+data['language'] = 'sage'
+data['metadata']['language_info']['name'] = 'sage'
+data['metadata']['language_info']['mimetype'] = 'text/x-sage'
+path.write_text(json.dumps(data, indent=2) + "\n")
+print(path)
+PY
+```
+
+If you edit this file, restart the notebook server and re-open any active tabs.
+
+## What the server currently does
+
+This plugin is a Sage-aware static hint layer on top of `pylsp`:
+
+- it detects Sage notebook context using language id (`sage`, `sagews`, `sage3`) or
+  Sage file extensions (`.sage`, `.spyx`, `.sws`, `.sagews`);
+- for Python-labeled notebook documents (`.ipynb`), it only surfaces Sage symbols when
+  either a Sage import marker is present or the active prefix matches a known Sage
+  identifier (this avoids turning every Python notebook into a Sage completion bucket);
+- suggests matching Sage identifiers as completion items.
+
+## Notes on accuracy and scope
+
+- This package is a practical completion layer for Sage notebooks, not a parser-aware
+  full semantic-analysis engine.
+- It provides broad, manifest-driven completions/hover/signature hints.
+- A deeper parser/type engine for end-to-end symbolic semantics is still the next step
+  for research UX.
+
+## Verification checklist
+
+1. Confirm `jupyter-lsp` uses this config file:
+   `~/.jupyter/jupyter_server_config.d/sage-lsp.json`
+2. Confirm kernel metadata contains:
+   `language: "sage"` and `metadata.language_info.mimetype: "text/x-sage"`.
+3. Open a Sage cell containing `IntegralLattice` and check completion behavior
+   includes the Sage symbol.
+
+## Companion extension note
+
+The prior frontend extension approach (`jupyterlab-sage-highlighter`) is now a
+compatibility shim:
+
+- it loads and no-ops at activation;
+- it does not patch LSP internals anymore;
+- syntax assistance should come from the `python-lsp-server` extension via `jupyter-lsp`.
+
+## Files to read next
+
+- `docs/ARCHITECTURE.md` for data flow and tokenization assumptions.
+- `docs/INTEGRATION.md` for command-by-command setup.
+- `docs/TROUBLESHOOTING.md` for common failures and what to inspect.

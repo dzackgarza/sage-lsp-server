@@ -1,0 +1,5 @@
+[console_scripts]
+sage-lsp = sage_lsp.__main__:main
+
+[pylsp]
+sage = sage_lsp.server
