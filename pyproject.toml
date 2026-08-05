@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sage-lsp"
-version = "0.2.0"
+version = "0.3.0"
 description = "Sage-aware Language Server Protocol server for JupyterLab syntax intelligence"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,9 +13,7 @@ dependencies = [
   "python-lsp-server>=1.14.0",
   "pyflakes",
   "pycodestyle",
-  # The SagePython compiler (sage-free core of the research preamble)
-  # and its grammar, tracked at their git mains.
-  "dzack-research-preamble @ git+https://github.com/dzackgarza/research#subdirectory=src/dzack_research/preamble",
+  # The SagePython compiler ships with the grammar, tracked at git main.
   "tree-sitter",
   "tree-sitter-sage @ git+https://github.com/dzackgarza/tree-sitter-sage",
 ]
