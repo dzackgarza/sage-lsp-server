@@ -11,4 +11,6 @@ src/sage_lsp.egg-info/dependency_links.txt
 src/sage_lsp.egg-info/entry_points.txt
 src/sage_lsp.egg-info/requires.txt
 src/sage_lsp.egg-info/top_level.txt
+src/sage_lsp/data/sage_all_symbols.json
+tests/test_lint.py
 tests/test_server.py
