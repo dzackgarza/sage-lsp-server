@@ -75,6 +75,14 @@ def test_sage_globals_are_not_undefined_names() -> None:
     assert lint_document(document) == []
 
 
+def test_set_builder_notation_lints_clean() -> None:
+    document = _sage(
+        "S = {x^2 | x in [1..5]}\nT = {p in NN | p.is_prime()}\nU = {1, 2}\n"
+    )
+
+    assert lint_document(document) == []
+
+
 def test_plain_python_documents_lint_unlowered() -> None:
     document = Doc("file:///plain.py", "python", "value = missing_name\n")
 

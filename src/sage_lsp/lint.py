@@ -21,8 +21,15 @@ from typing import Any
 import pycodestyle
 from pyflakes import checker as pyflakes_checker
 
+import sagepython
+import sagepython.research
+
 from sage_lsp.preprocess import lowered_for
 from sage_lsp.server import SAGE_SYMBOLS, _has_sage_context
+
+_BUILTINS: tuple[str, ...] = (
+    SAGE_SYMBOLS + sagepython.RUNTIME_NAMES + sagepython.research.RUNTIME_NAMES
+)
 
 _SOURCE = "sage-lsp"
 _ERROR = 1
@@ -101,7 +108,7 @@ def lint_document(document: Any) -> list[Diagnostic]:
     source_map = lowered.source_map
     diagnostics: list[Diagnostic] = []
 
-    warnings, syntax_error = _pyflakes_findings(lowered.python, SAGE_SYMBOLS)
+    warnings, syntax_error = _pyflakes_findings(lowered.python, _BUILTINS)
     if syntax_error is not None:
         line, column, message = syntax_error
         original = source_map.original_position(line, column)
