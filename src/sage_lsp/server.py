@@ -79,11 +79,11 @@ class _TextDocument(Protocol):
 class _LanguageTagged(Protocol):
     """Notebook cells declare a language id; plain documents do not."""
 
-    language_id: str | None
+    language_id: str
 
 
 def _declared_language(document: object) -> str:
-    if isinstance(document, _LanguageTagged) and document.language_id is not None:
+    if isinstance(document, _LanguageTagged):
         return str(document.language_id).lower()
     return ""
 
