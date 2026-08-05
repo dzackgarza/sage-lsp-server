@@ -1,13 +1,34 @@
-test:
-	PYTHONPATH=src pytest -q tests
+# ai-review-ci Python QC delegation justfile.
+# The central implementation lives in ~/ai-review-ci/justfiles/python.just.
+# Public recipes delegate to that central justfile while preserving this repo as the caller root.
 
-refresh-sage-manifest:
-	python3 scripts/generate_sage_all_manifest.py
+# ai-review-ci contract variables consumed by doctor and workflow installers.
+ai_review_ci_schema_version := "1"
+ai_review_ci_profile := "python"
+ai_review_ci_ref := "main"
+ai_review_ci_release_channel := "main"
+ai_review_ci_workflow_template_version := "1"
+ai_review_ci_local_delegation := "global-justfile"
+ai_review_ci_default_branch := "main"
 
-# Gates invoked by the machine-wide ai-review-ci git hooks.  The
-# package is installed editable in .venv, so running installations
-# track the source tree and a push needs no refresh.
+# List available recipes.
+default:
+    @just --list
+
+# Run commit-tier Python QC through the central implementation.
 test-commit:
-	.venv/bin/python -m pytest -q tests
+    @just -f ~/ai-review-ci/justfiles/python.just -d . test-commit
 
-test-push: test-commit
+# Run the full Python test suite before pushing.  The package is
+# installed editable in .venv, so running installations track the
+# source tree and no refresh step is needed.
+test-push:
+    @just -f ~/ai-review-ci/justfiles/python.just -d . test-push
+
+# Run CI acceptance QC through the central implementation.
+test-ci:
+    @just -f ~/ai-review-ci/justfiles/python.just -d . test-ci
+
+# Regenerate the Sage global-symbol manifest shipped with the server.
+refresh-sage-manifest:
+    python3 scripts/generate_sage_all_manifest.py
