@@ -277,7 +277,7 @@ def pylsp_settings() -> dict[str, object]:
 
 
 @hookimpl
-def pylsp_lint(config: object, workspace: object, document: _TextDocument, is_saved: bool) -> list[dict[str, object]]:
+def pylsp_lint(config: object, workspace: object, document: _TextDocument, is_saved: object) -> list[dict[str, object]]:
     from sage_lsp.lint import lint_document
 
     return lint_document(document)
