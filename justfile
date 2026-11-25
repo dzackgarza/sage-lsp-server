@@ -14,7 +14,7 @@ default:
 test-commit:
     @just -f ~/ai-review-ci/justfiles/python.just -d . test-commit
 
-[doc("Run the full Python test suite before pushing.  The package is")]
+[doc("Run the full Python test suite before pushing.")]
 test-push:
     @just -f ~/ai-review-ci/justfiles/python.just -d . test-push
 
